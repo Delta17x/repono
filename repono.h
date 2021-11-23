@@ -79,6 +79,91 @@ namespace as {
 	};
 
 	template<typename T>
+	class linked_list_node {
+		using value_type = T;
+	public:
+		value_type value;
+		linked_list_node* next;
+		linked_list_node* back;
+		linked_list_node() {
+			value = value_type();
+			next = back = nullptr;
+		}
+		linked_list_node(const value_type& val) {
+			value = val;
+			next = back = nullptr;
+		}
+		linked_list_node(const value_type& val, linked_list_node* n, linked_list_node* b) {
+			value = val;
+			n->back = b->next = this;
+			next = n;
+			back = b;
+		}
+	};
+
+	template<typename T>
+	class linked_list {
+		using value_type = T;
+		using ptr_type = T*;
+		int _size;
+	public:
+		linked_list_node<value_type>* first;
+		linked_list_node<value_type>* last;
+		linked_list() {
+			first = last = new linked_list_node<value_type>();
+			_size = 1;
+		}
+		linked_list(const value_type& val) {
+			first = last = new linked_list_node<value_type>(val);
+			_size = 1;
+		}
+		~linked_list() {
+			while (first->next != nullptr) {
+				auto temp = first->next;
+				delete first;
+				first = temp;
+			}
+		}
+		inline value_type& operator[] (const int index) {
+			linked_list_node<value_type>* cur = first;
+			for (int i = 0; i < index; i++) {
+				cur = cur->next;
+			}
+			return cur->value;
+		}
+		inline void add(const value_type& val) {
+			last->next = new linked_list_node<value_type>(val);
+			last->next->back = last;
+			last = last->next;
+			_size++;
+		}
+		inline void remove(const int index) {
+			linked_list_node<value_type>* cur = first;
+			for (int i = 0; i < index; i++) {
+				cur = cur->next;
+			}
+			cur->back->next = cur->next;
+			cur->next->back = cur->back;
+			_size--;
+		}
+		// Inserts the element to the index, pushing the value in its place forward.
+		inline void insert(const value_type& val, int index) {
+			linked_list_node<value_type>* cur = first;
+			for (int i = 0; i < index; i++) {
+				cur = cur->next;
+			}
+			cur->back->next = new linked_list_node<value_type>(val);
+			cur->back->next->next = cur;
+			cur->back = cur->back->next;
+			_size++;
+		}
+		// Returns the amount of nodes in this linked_list. Note that manual insertion of nodes will cause this to return an incorrect count.
+		inline const int size() const noexcept {
+			return _size;
+		}
+	};
+
+	template<typename T>
 	class vector {
 		using value_type = T;
 		using ptr_type = T*;
