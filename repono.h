@@ -28,7 +28,17 @@ SOFTWARE.
 #endif // !_INITIALIZER_LIST_
 
 namespace as {
-	template<typename _T, std::size_t s>
+#ifdef __EDG_SIZE_TYPE__
+	typedef __EDG_SIZE_TYPE__ size_type;
+#elif defined __SIZE_TYPE__
+	typedef __SIZE_TYPE__ size_type;
+#elif defined _WIN64
+	typedef unsigned long long size_type;
+#else
+	typedef unsigned long int size_type;
+#endif
+	
+	template<typename _T, size_type s>
 	class array {
 		using value_type = _T;
 		using ptr_type = _T*;
@@ -61,10 +71,10 @@ namespace as {
 		~array() {
 			delete[] ptr;
 		}
-		[[nodiscard]] inline constexpr value_type& operator[] (const int a) {
+		[[nodiscard]] inline constexpr value_type& operator[] (size_type a) {
 			return ptr[a];
 		}
-		inline const constexpr std::size_t size() {
+		inline const constexpr size_type size() {
 			return s;
 		}
 		[[nodiscard]] inline constexpr const ptr_type begin() {
@@ -75,7 +85,7 @@ namespace as {
 		}
 	private:
 		ptr_type ptr;
-		const std::size_t sizet = sizeof(value_type);
+		const size_type sizet = sizeof(value_type);
 	};
 
 	template<typename T>
@@ -124,7 +134,7 @@ namespace as {
 				first = temp;
 			}
 		}
-		inline value_type& operator[] (const int index) {
+		inline value_type& operator[] (size_type index) {
 			linked_list_node<value_type>* cur = first;
 			for (int i = 0; i < index; i++) {
 				cur = cur->next;
@@ -137,7 +147,7 @@ namespace as {
 			last = last->next;
 			_size++;
 		}
-		inline void remove(const int index) {
+		inline void remove(const size_type index) {
 			linked_list_node<value_type>* cur = first;
 			for (int i = 0; i < index; i++) {
 				cur = cur->next;
@@ -147,7 +157,7 @@ namespace as {
 			_size--;
 		}
 		// Inserts the element to the index, pushing the value in its place forward.
-		inline void insert(const value_type& val, int index) {
+		inline void insert(size_type index, const value_type& val) {
 			linked_list_node<value_type>* cur = first;
 			for (int i = 0; i < index; i++) {
 				cur = cur->next;
@@ -168,14 +178,14 @@ namespace as {
 		using value_type = T;
 		using ptr_type = T*;
 		ptr_type ptr;
-		std::size_t occ_elems;
-		std::size_t ptr_size;
+		size_type occ_elems;
+		size_type ptr_size;
 	public:
 		constexpr vector() : ptr_size(2), occ_elems(1) {
 			ptr = new value_type[2];
 			ptr[0] = value_type();
 		}
-		vector(const std::size_t size) : occ_elems(1), ptr_size(size) {
+		vector(const size_type size) : occ_elems(1), ptr_size(size) {
 			ptr = new value_type[ptr_size];
 			ptr[0] = value_type();
 		}
@@ -187,7 +197,7 @@ namespace as {
 			}
 		}
 		vector(const vector<value_type>& other) : occ_elems(other.occ_elems), ptr_size(other.ptr_size) {
-			ptr = new value_type[ptr_size];			
+			ptr = new value_type[ptr_size];
 			for (int i = 0; i < occ_elems; i++) {
 				ptr[i] = other.ptr[i];
 			}
@@ -216,7 +226,7 @@ namespace as {
 		[[nodiscard]] inline constexpr const ptr_type begin() const noexcept {
 			return &ptr[0];
 		}
-		[[nodiscard]] inline constexpr value_type& operator[] (const int a) noexcept {
+		[[nodiscard]] inline constexpr value_type& operator[] (size_type a) noexcept {
 			return ptr[a];
 		}
 		[[nodiscard]] inline constexpr const ptr_type end() const noexcept {
@@ -227,10 +237,10 @@ namespace as {
 				throw "[rn] Index given to vector out of range.";
 			return ptr[index];
 		}
-		inline constexpr const std::size_t size() const noexcept {
+		inline constexpr const size_type size() const noexcept {
 			return occ_elems;
 		}
-		inline constexpr const std::size_t capacity() const noexcept {
+		inline constexpr const size_type capacity() const noexcept {
 			return ptr_size;
 		}
 		inline constexpr const bool empty() const noexcept {
@@ -243,7 +253,7 @@ namespace as {
 		inline constexpr value_type& pop_back() {
 			return ptr[--occ_elems];
 		}
-		inline constexpr void resize(std::size_t new_size) {
+		inline constexpr void resize(size_type new_size) {
 			size_t old_size = ptr_size;
 			auto new_ptr = new value_type[new_size];
 			for (int i = 0; i < old_size; i++) {
@@ -251,6 +261,24 @@ namespace as {
 			}
 			delete[] ptr;
 			ptr = new_ptr;
+		}
+		// Does not fully work.
+		inline void insert(const size_type index, const value_type& val) {
+			if (occ_elems >= ptr_size) {
+				size_t old_size = ptr_size;
+				auto new_ptr = new value_type[ptr_size *= 2];
+				for (int i = 0; i < old_size; i++) {
+					new_ptr[i] = ptr[i];
+				}
+				delete[] ptr;
+				ptr = new_ptr;
+			}
+			ptr_type to_move = begin() + index;
+			ptr[index] = val;
+			for (int i = 0; i <= occ_elems; i++) {
+				ptr[i + index + 1] = to_move[i];
+			}
+			occ_elems++;
 		}
 		inline constexpr void push_back(const value_type& val) {
 			// need to make ptr bigger and then copy ptr_last to ptr
@@ -276,3 +304,4 @@ namespace as {
 	};
 }
 #endif
+
