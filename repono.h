@@ -26,8 +26,8 @@ SOFTWARE.
 #ifndef _INITIALIZER_LIST_
 #include <initializer_list>
 #endif // !_INITIALIZER_LIST_
-
 namespace as {
+// Category: Size Type
 #ifdef __EDG_SIZE_TYPE__
 	typedef __EDG_SIZE_TYPE__ size_type;
 #elif defined __SIZE_TYPE__
@@ -38,55 +38,87 @@ namespace as {
 	typedef unsigned long int size_type;
 #endif
 	
-	template<typename _T, size_type s>
-	class array {
-		using value_type = _T;
-		using ptr_type = _T*;
-	public:
-		array() {
-			ptr = new value_type[s];
+// Category: Default Allocators
+	// The default allocator used for repono data structures.
+	template<typename T>
+	struct allocator {
+		using value_type = T;
+		using ptr_type = T*;
+		[[nodiscard]] static inline constexpr ptr_type alloc(const size_type amount) noexcept {
+			return new value_type[amount];
+		} 
+		static inline constexpr void dealloc(ptr_type allocated) noexcept {
+			delete[] allocated;
 		}
-		array(const value_type& first) {
-			ptr = new value_type[s];
+	};
+// Category: Array
+
+	// Encapsulates an array with a fixed length (does not need to be a compile-time constant). Allocated on the heap.
+	template<typename T, class Allocator = ::as::allocator<T>>
+	class array {
+		using value_type = T;
+		using ptr_type = T*;
+	public:
+		array() : siz(8) {
+			ptr = Allocator::alloc(8);
+		}
+		array(size_type s) : siz(s) {
+			ptr = Allocator::alloc(s);
+		}
+		array(const value_type& first, size_type s) : siz(s) {
+			ptr = Allocator::alloc(s);
 			ptr[0] = first;
 		}
-		array(const array<value_type, s>& other) {
-			for (int i = 0; i < s; i++) {
+		array(const array<value_type, Allocator>& other) {
+			ptr = Allocator::alloc(siz = other.siz);
+			for (int i = 0; i < siz; i++) {
 				ptr[i] = other.ptr[i];
 			}
 		}
 		array(const std::initializer_list<value_type> a) {
-			ptr = new value_type[s];
+			ptr = Allocator::alloc(siz = a.size());
 			int i = 0;
 			for (const value_type& iter : a) {
 				ptr[i++] = iter;
 			}
 		}
-		inline constexpr array<value_type, s>& operator= (const array<value_type, s>& other) {
-			for (int i = 0; i < s; i++) {
+		inline constexpr array<value_type, Allocator>& operator= (const array<value_type, Allocator>& other) {
+			for (int i = 0; i < (siz = other.siz); i++) {
 				ptr[i] = other.ptr[i];
 			}
 			return *this;
 		}
 		~array() {
-			delete[] ptr;
+			Allocator::dealloc(ptr);
 		}
 		[[nodiscard]] inline constexpr value_type& operator[] (size_type a) {
 			return ptr[a];
 		}
 		inline const constexpr size_type size() {
-			return s;
+			return siz;
 		}
 		[[nodiscard]] inline constexpr const ptr_type begin() {
 			return &ptr[0];
 		}
 		[[nodiscard]] inline constexpr const ptr_type end() {
-			return &ptr[s];
+			return &ptr[siz];
 		}
 	private:
 		ptr_type ptr;
-		const size_type sizet = sizeof(value_type);
+		size_type siz;
 	};
+
+	template<typename T, typename Alloc>
+	inline constexpr const bool operator==(const array<T, Alloc>& a, const array<T, Alloc>& other) noexcept {
+		if (a.size() != other.size())
+			return false;
+		for (int i = 0; i < a.size(); i++)
+			if (a[i] != other[i])
+				return false;
+		return true;
+	}
+
+// Category: Linked List
 
 	template<typename T>
 	class linked_list_node {
@@ -158,14 +190,25 @@ namespace as {
 		}
 		// Inserts the element to the index, pushing the value in its place forward.
 		inline void insert(size_type index, const value_type& val) {
-			linked_list_node<value_type>* cur = first;
-			for (int i = 0; i < index; i++) {
-				cur = cur->next;
+			if (index < _size++) {
+				linked_list_node<value_type>* cur = first;
+				for (int i = 0; i < index; i++) {
+					cur = cur->next;
+				}
+				if (cur && cur->back) {
+					cur->back->next = new linked_list_node<value_type>(val);
+					cur->back->next->next = cur;
+					cur->back = cur->back->next;
+				}
 			}
-			cur->back->next = new linked_list_node<value_type>(val);
-			cur->back->next->next = cur;
-			cur->back = cur->back->next;
-			_size++;
+			else {
+				size_type i = 0;
+				linked_list_node<value_type>* cur = last;
+				while (i++ < index) {
+					cur = cur->next = new linked_list_node<value_type>();
+				}
+				cur->next = new linked_list_node<value_type>(val);
+			}
 		}
 		// Returns the amount of nodes in this linked_list. Note that manual insertion of nodes will cause this to return an incorrect count.
 		inline const int size() const noexcept {
@@ -173,7 +216,10 @@ namespace as {
 		}
 	};
 
-	template<typename T>
+// Category: Vector
+
+	// A container that acts as a dynamically sized array.
+	template<typename T, class Allocator = ::as::allocator<T>>
 	class vector {
 		using value_type = T;
 		using ptr_type = T*;
@@ -181,47 +227,45 @@ namespace as {
 		size_type occ_elems;
 		size_type ptr_size;
 	public:
-		constexpr vector() : ptr_size(2), occ_elems(1) {
-			ptr = new value_type[2];
+		constexpr vector() : ptr_size(10), occ_elems(1) {
+			ptr = Allocator::alloc(10);
 			ptr[0] = value_type();
 		}
 		vector(const size_type size) : occ_elems(1), ptr_size(size) {
-			ptr = new value_type[ptr_size];
+			ptr = Allocator::alloc(ptr_size);
 			ptr[0] = value_type();
 		}
-		vector(std::initializer_list<value_type> list) : ptr_size(list.size() + 1), occ_elems(list.size()) {
-			ptr = new value_type[ptr_size];
+		vector(std::initializer_list<value_type> list) : ptr_size(list.size()), occ_elems(list.size()) {
+			ptr = Allocator::alloc(ptr_size);
 			int i = 0;
 			for (const value_type& iter : list) {
 				ptr[i++] = iter;
 			}
 		}
 		vector(const vector<value_type>& other) : occ_elems(other.occ_elems), ptr_size(other.ptr_size) {
-			ptr = new value_type[ptr_size];
+			ptr = Allocator::alloc(ptr_size);
 			for (int i = 0; i < occ_elems; i++) {
 				ptr[i] = other.ptr[i];
 			}
 		}
 		vector(vector<value_type>&& other) noexcept : occ_elems(other.occ_elems), ptr_size(other.ptr_size) {
-			ptr = new value_type[ptr_size];
+			ptr = Allocator::alloc(ptr_size);
 			for (int i = 0; i < occ_elems; i++) {
 				ptr[i] = other.ptr[i];
 			}
-			delete[] other.ptr;
-			other.ptr = nullptr;
+			Allocator::dealloc(other.ptr);
 		}
 		inline constexpr vector<value_type>& operator=(const vector<value_type>& other) {
 			occ_elems = other.occ_elems;
-			ptr_size = other.ptr_size;
-			delete[] ptr;
-			ptr = new value_type[ptr_size];
+			Allocator::dealloc(ptr);
+			ptr = Allocator::alloc(ptr_size = other.ptr_size);
 			for (int i = 0; i < occ_elems; i++) {
 				ptr[i] = other.ptr[i];
 			}
 			return *this;
 		}
 		~vector() {
-			delete[] ptr;
+			Allocator::dealloc(ptr);
 		}
 		[[nodiscard]] inline constexpr const ptr_type begin() const noexcept {
 			return &ptr[0];
@@ -255,53 +299,45 @@ namespace as {
 		}
 		inline constexpr void resize(size_type new_size) {
 			size_t old_size = ptr_size;
-			auto new_ptr = new value_type[new_size];
+			auto new_ptr = Allocator::alloc(ptr_size = new_size);
 			for (int i = 0; i < old_size; i++) {
 				new_ptr[i] = ptr[i];
 			}
-			delete[] ptr;
+			Allocator::dealloc(ptr);
 			ptr = new_ptr;
 		}
-		// Does not fully work.
-		inline void insert(const size_type index, const value_type& val) {
-			if (occ_elems >= ptr_size) {
-				size_t old_size = ptr_size;
-				auto new_ptr = new value_type[ptr_size *= 2];
-				for (int i = 0; i < old_size; i++) {
-					new_ptr[i] = ptr[i];
-				}
-				delete[] ptr;
-				ptr = new_ptr;
+		// TODO: optimize a lot
+		inline constexpr void insert(const size_type index, const value_type& val) {
+			ptr_type to_move_ptr = begin() + index;
+			ptr_type to_move = Allocator::alloc(occ_elems - index);
+			for (int i = 0; i < occ_elems - index; i++) {
+				to_move[i] = to_move_ptr[i];
 			}
-			ptr_type to_move = begin() + index;
 			ptr[index] = val;
 			for (int i = 0; i <= occ_elems; i++) {
 				ptr[i + index + 1] = to_move[i];
 			}
 			occ_elems++;
+			Allocator::dealloc(to_move);
 		}
+
 		inline constexpr void push_back(const value_type& val) {
-			// need to make ptr bigger and then copy ptr_last to ptr
-			if (occ_elems >= ptr_size) {
-				size_t old_size = ptr_size;
-				auto new_ptr = new value_type[ptr_size *= 2];
-				for (int i = 0; i < old_size; i++) {
-					new_ptr[i] = ptr[i];
-				}
-				delete[] ptr;
-				ptr = new_ptr;
-			}
+			if (occ_elems >= ptr_size) 
+				resize(ptr_size * 3);
 			ptr[occ_elems++] = val;
 		}
-		inline constexpr const bool operator==(const vector<value_type>& other) const noexcept {
-			if (occ_elems != other.occ_elems || ptr_size != other.ptr_size)
-				return false;
-			for (int i = 0; i < occ_elems; i++)
-				if (ptr[i] != other.ptr[i])
-					return false;
-			return true;
-		}
 	};
+
+	template<typename T, typename Alloc>
+	inline constexpr const bool operator==(const vector<T, Alloc>& a, const vector<T, Alloc>& other) noexcept {
+		if (a.size() != other.size() || a.capacity() != other.capacity())
+			return false;
+		for (int i = 0; i < a.size(); i++)
+			if (a[i] != other[i])
+				return false;
+		return true;
+	}
 }
 #endif
+
 
