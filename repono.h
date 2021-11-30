@@ -402,11 +402,6 @@ namespace as {
 		dict() : elem_count(1), ptr(), keys(), alloc() {
 
 		}
-		~dict() {
-			ptr.~vector();
-			keys.~vector();
-			alloc.~Allocator();
-		}
 		inline const size_type size() const noexcept {
 			return elem_count;
 		}
