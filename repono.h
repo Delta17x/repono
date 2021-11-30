@@ -348,7 +348,7 @@ namespace rn {
 		inline constexpr reference pop_back() {
 			return ptr[--occ_elems];
 		}
-		inline constexpr void resize(size_type new_size) {
+		inline constexpr void resize(size_type new_size){
 			size_type old_size = ptr_size;
 			auto new_ptr = alloc.allocate(ptr_size = new_size);
 			for (int i = 0; i < old_size; i++) {
@@ -357,25 +357,19 @@ namespace rn {
 			alloc.deallocate(ptr);
 			ptr = new_ptr;
 		}
-		// TODO: optimize a lot
-		// TODO: causes an error, probably because memory being deleted 
 		inline constexpr void insert(const size_type index, const_reference val) {
-			pointer to_move_array = alloc.allocate(occ_elems - index + 1);
-			for (int i = 0; i < occ_elems; i++) {
-				to_move_array[i] = ptr[i + index];
+			if (++occ_elems >= ptr_size)
+				resize(ptr_size * 3);
+			for (int i = occ_elems - 1; i > index; i--) {
+				ptr[i] = ptr[i - 1];
 			}
 			ptr[index] = val;
-			for (int i = 0; i <= occ_elems; i++) {
-				ptr[i + index + 1] = to_move_array[i];
-			}
-			occ_elems++;
-			alloc.deallocate(to_move_array);
 		}
 
 		inline constexpr void push_back(const_reference val) {
-			if (occ_elems >= ptr_size)
-				resize(ptr_size * 4);
-			ptr[occ_elems++] = val;
+			if (++occ_elems >= ptr_size)
+				resize(ptr_size * 3);
+			ptr[occ_elems - 1] = val;
 		}
 
 		// Returns the index of the first instance of the element given. If the element could not be found, returns -1 as a size_type. O(N) time complexity.
@@ -426,9 +420,3 @@ namespace rn {
 #undef ASSERT_IF_CONST
 }
 #endif
-
-
-
-
-
-
