@@ -25,7 +25,7 @@ SOFTWARE.
 #define _REPONO_
 #include <initializer_list>
 namespace as {
-// Category: Size Type
+	// Category: Size Type
 #ifdef __EDG_SIZE_TYPE__
 	typedef __EDG_SIZE_TYPE__ size_type;
 #elif defined __SIZE_TYPE__
@@ -37,7 +37,7 @@ namespace as {
 #endif
 
 
-// Category: Tools
+	// Category: Tools
 	struct true_type {
 		constexpr static bool value = true;
 		constexpr operator bool() const noexcept { return value; }
@@ -59,8 +59,8 @@ namespace as {
 #else
 #define ASSERT_IF_CONST(x)
 #endif
-// Category: Default Allocators
-	// The default allocator used for repono data structures.
+	// Category: Default Allocators
+		// The default allocator used for repono data structures.
 	template<typename T>
 	struct allocator {
 		using pointer = T*;
@@ -68,14 +68,14 @@ namespace as {
 		allocator() {}
 		[[nodiscard]] inline constexpr pointer allocate(const size_type amount) const noexcept {
 			return new T[amount];
-		} 
+		}
 		inline constexpr void deallocate(pointer allocated) const noexcept {
 			delete[] allocated;
 		}
 	};
-// Category: Array
+	// Category: Array
 
-	// Encapsulates an array with a fixed length (does not need to be a compile-time constant). Allocated on the heap.
+		// Encapsulates an array with a fixed length (does not need to be a compile-time constant). Allocated on the heap.
 	template<typename T, class Allocator = ::as::allocator<T>>
 	class array {
 		ASSERT_IF_CONST(T);
@@ -146,7 +146,7 @@ namespace as {
 		return true;
 	}
 
-// Category: Linked List
+	// Category: Linked List
 
 	template<typename T, typename Allocator = ::as::allocator<T>>
 	class linked_list_node {
@@ -251,9 +251,9 @@ namespace as {
 		}
 	};
 
-// Category: Vector
+	// Category: Vector
 
-	// A container that acts as a dynamically sized array.
+		// A container that acts as a dynamically sized array.
 	template<typename T, class Allocator = ::as::allocator<T>>
 	class vector {
 		ASSERT_IF_CONST(T);
@@ -318,7 +318,7 @@ namespace as {
 			return &ptr[occ_elems];
 		}
 		inline constexpr reference at(const int index) {
-			if (index < 0 || index >= occ_elems)-
+			if (index < 0 || index >= occ_elems) -
 				throw "[rn] Index given to vector out of range.";
 			return ptr[index];
 		}
@@ -363,7 +363,7 @@ namespace as {
 		}
 
 		inline constexpr void push_back(const_reference val) {
-			if (occ_elems >= ptr_size) 
+			if (occ_elems >= ptr_size)
 				resize(ptr_size * 3);
 			ptr[occ_elems++] = val;
 		}
@@ -393,17 +393,19 @@ namespace as {
 		using pointer = typename Allocator::pointer;
 		using const_pointer = typename Allocator::const_pointer;
 		using reference = T&;
-		using const_reference = const T&;		
+		using const_reference = const T&;
 		Allocator alloc;
 		vector<value_type, Allocator> ptr;
 		vector<key_type, Allocator> keys;
 		size_type elem_count;
 	public:
-		dict() : elem_count(1) {
+		dict() : elem_count(1), ptr(), keys(), alloc() {
 
 		}
 		~dict() {
-
+			ptr.~vector();
+			keys.~vector();
+			alloc.~Allocator();
 		}
 		inline const size_type size() const noexcept {
 			return elem_count;
@@ -416,9 +418,10 @@ namespace as {
 		[[nodiscard]] inline constexpr reference operator[] (key_type a) noexcept {
 			return ptr[keys.find(a)];
 		}
-	}; 
+	};
 #undef ASSERT_IF_CONST
 }
 #endif
+
 
 
