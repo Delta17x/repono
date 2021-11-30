@@ -24,7 +24,7 @@ SOFTWARE.
 #ifndef _REPONO_
 #define _REPONO_
 #include <initializer_list>
-namespace as {
+namespace rn {
 	// Category: Size Type
 #ifdef __EDG_SIZE_TYPE__
 	typedef __EDG_SIZE_TYPE__ size_type;
@@ -55,7 +55,7 @@ namespace as {
 	struct is_const<const T> : public true_type {};
 
 #if __cplusplus >= 199711L
-#define ASSERT_IF_CONST(x) static_assert(!is_const<##x>::value, "Repono and the C++ Standard do not support containers of const objects.")
+#define ASSERT_IF_CONST(x) static_assert(!is_const< x >::value, "Repono and the C++ Standard do not support containers of const objects.")
 #else
 #define ASSERT_IF_CONST(x)
 #endif
@@ -76,7 +76,7 @@ namespace as {
 	// Category: Array
 
 		// Encapsulates an array with a fixed length (does not need to be a compile-time constant). Allocated on the heap.
-	template<typename T, class Allocator = ::as::allocator<T>>
+	template<typename T, class Allocator = ::rn::allocator<T>>
 	class array {
 		ASSERT_IF_CONST(T);
 		using value_type = T;
@@ -148,7 +148,7 @@ namespace as {
 
 	// Category: Linked List
 
-	template<typename T, typename Allocator = ::as::allocator<T>>
+	template<typename T, typename Allocator = ::rn::allocator<T>>
 	class linked_list_node {
 		using value_type = T;
 		using pointer = typename Allocator::pointer;
@@ -175,7 +175,7 @@ namespace as {
 		}
 	};
 
-	template<typename T, typename Allocator = ::as::allocator<T>>
+	template<typename T, typename Allocator = ::rn::allocator<T>>
 	class linked_list {
 		using value_type = T;
 		using pointer = typename Allocator::pointer;
@@ -254,7 +254,7 @@ namespace as {
 	// Category: Vector
 
 		// A container that acts as a dynamically sized array.
-	template<typename T, class Allocator = ::as::allocator<T>>
+	template<typename T, class Allocator = ::rn::allocator<T>>
 	class vector {
 		ASSERT_IF_CONST(T);
 		using value_type = T;
@@ -298,15 +298,22 @@ namespace as {
 		inline constexpr vector<value_type>& operator=(const vector<value_type>& other) {
 			occ_elems = other.occ_elems;
 			alloc.deallocate(ptr);
+			ptr = nullptr;
 			ptr = alloc.allocate(ptr_size = other.ptr_size);
 			for (int i = 0; i < occ_elems; i++) {
 				ptr[i] = other.ptr[i];
 			}
 			return *this;
 		}
+		
 		~vector() {
+			// TODO: THIS LINE THROWS AN ERROR IF INSERT() IS CALLED
 			alloc.deallocate(ptr);
-			alloc.~Allocator();
+			ptr = nullptr;
+			//alloc.~Allocator();
+		}
+		[[nodiscard]] inline constexpr pointer begin() noexcept {
+			return &ptr[0];
 		}
 		[[nodiscard]] inline constexpr const_pointer begin() const noexcept {
 			return &ptr[0];
@@ -314,11 +321,14 @@ namespace as {
 		[[nodiscard]] inline constexpr reference operator[] (size_type a) noexcept {
 			return ptr[a];
 		}
+		[[nodiscard]] inline constexpr pointer end() noexcept {
+			return &ptr[occ_elems];
+		}
 		[[nodiscard]] inline constexpr const_pointer end() const noexcept {
 			return &ptr[occ_elems];
 		}
 		inline constexpr reference at(const int index) {
-			if (index < 0 || index >= occ_elems) -
+			if (index < 0 || index >= occ_elems)
 				throw "[rn] Index given to vector out of range.";
 			return ptr[index];
 		}
@@ -339,7 +349,7 @@ namespace as {
 			return ptr[--occ_elems];
 		}
 		inline constexpr void resize(size_type new_size) {
-			size_t old_size = ptr_size;
+			size_type old_size = ptr_size;
 			auto new_ptr = alloc.allocate(ptr_size = new_size);
 			for (int i = 0; i < old_size; i++) {
 				new_ptr[i] = ptr[i];
@@ -348,27 +358,27 @@ namespace as {
 			ptr = new_ptr;
 		}
 		// TODO: optimize a lot
+		// TODO: causes an error, probably because memory being deleted 
 		inline constexpr void insert(const size_type index, const_reference val) {
-			pointer to_move_ptr = begin() + index;
-			pointer to_move = alloc.allocate(occ_elems - index);
-			for (int i = 0; i < occ_elems - index; i++) {
-				to_move[i] = to_move_ptr[i];
+			pointer to_move_array = alloc.allocate(occ_elems - index + 1);
+			for (int i = 0; i < occ_elems; i++) {
+				to_move_array[i] = ptr[i + index];
 			}
 			ptr[index] = val;
 			for (int i = 0; i <= occ_elems; i++) {
-				ptr[i + index + 1] = to_move[i];
+				ptr[i + index + 1] = to_move_array[i];
 			}
 			occ_elems++;
-			alloc.deallocate(to_move);
+			alloc.deallocate(to_move_array);
 		}
 
 		inline constexpr void push_back(const_reference val) {
 			if (occ_elems >= ptr_size)
-				resize(ptr_size * 3);
+				resize(ptr_size * 4);
 			ptr[occ_elems++] = val;
 		}
 
-		// Returns the index of the element given. If the element could not be found, returns -1 as a size_type. O(N) time complexity.
+		// Returns the index of the first instance of the element given. If the element could not be found, returns -1 as a size_type. O(N) time complexity.
 		inline constexpr size_type find(const value_type& val) const {
 			for (int i = 0; i < occ_elems; i++) {
 				if (val == ptr[i])
@@ -387,21 +397,20 @@ namespace as {
 				return false;
 		return true;
 	}
-	template<typename key_type, typename T, typename Allocator = as::allocator<T>>
+	template<typename key_type, typename T, typename key_allocator = ::rn::allocator<key_type>, typename val_allocator = ::rn::allocator<T>>
 	class dict {
 		using value_type = T;
-		using pointer = typename Allocator::pointer;
-		using const_pointer = typename Allocator::const_pointer;
+		using pointer = typename val_allocator::pointer;
+		using const_pointer = typename val_allocator::const_pointer;
 		using reference = T&;
 		using const_reference = const T&;
-		Allocator alloc;
-		vector<value_type, Allocator> ptr;
-		vector<key_type, Allocator> keys;
+		val_allocator val_alloc;
+		key_allocator key_alloc;
+		vector<value_type, val_allocator> ptr;
+		vector<key_type, key_allocator> keys;
 		size_type elem_count;
 	public:
-		dict() : elem_count(1), ptr(), keys(), alloc() {
-
-		}
+		dict() : val_alloc(), key_alloc(), ptr(), keys(), elem_count(1) {}
 		inline const size_type size() const noexcept {
 			return elem_count;
 		}
@@ -417,6 +426,9 @@ namespace as {
 #undef ASSERT_IF_CONST
 }
 #endif
+
+
+
 
 
 
