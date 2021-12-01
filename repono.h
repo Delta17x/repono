@@ -305,7 +305,7 @@ namespace rn {
 			}
 			return *this;
 		}
-		
+
 		~vector() {
 			// TODO: THIS LINE THROWS AN ERROR IF INSERT() IS CALLED
 			alloc.deallocate(ptr);
@@ -348,15 +348,16 @@ namespace rn {
 		inline constexpr reference pop_back() {
 			return ptr[--occ_elems];
 		}
-		inline constexpr void resize(size_type new_size){
+		inline constexpr void resize(size_type new_size) {
 			size_type old_size = ptr_size;
 			auto new_ptr = alloc.allocate(ptr_size = new_size);
 			for (int i = 0; i < old_size; i++) {
-				new_ptr[i] = ptr[i];
+				new_ptr[i] = ptr[i];	
 			}
 			alloc.deallocate(ptr);
 			ptr = new_ptr;
 		}
+		// TODO: optimize
 		inline constexpr void insert(const size_type index, const_reference val) {
 			if (++occ_elems >= ptr_size)
 				resize(ptr_size * 3);
